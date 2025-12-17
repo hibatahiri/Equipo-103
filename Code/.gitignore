@@ -1,0 +1,10 @@
+# Carpetas de compilación
+build/
+bin/
+obj/
+
+# Base de datos local
+data/tutoring.db
+
+# Archivos de VS Code
+.vscode/
