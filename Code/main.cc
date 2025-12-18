@@ -1,78 +1,166 @@
 #include <iostream>
-#include <vector>
 #include <string>
+#include <vector>
 #include "src/Database/DBManager.h"
 #include "src/Users/Users.h"
 #include "src/Alert/Alert.h"
 #include "src/Chat/Chat.h"
 #include "src/System/System.h"
 
+// Prototipos de funciones para organizar el código
+void mostrarMenuTutor(SystemController& system, DBManager& db);
+void mostrarMenuAlumno(SystemController& system, DBManager& db);
+
 int main() {
     DBManager db;
-
-    std::cout << "=== INICIANDO PRUEBA DEL SISTEMA UCO ===" << std::endl;
-
-    // 1. Conexión e Inicialización
+    
+    // 1. Inicialización de la Base de Datos
     if (!db.openConnection()) {
-        std::cerr << "Error: No se pudo abrir la base de datos." << std::endl;
+        std::cerr << "Error crítico: No se pudo conectar con la base de datos." << std::endl;
         return 1;
     }
     db.initializeSchema();
-
-    // 2. CREACIÓN DE USUARIOS
-    // Estos datos se guardarán físicamente en la DB
-    User tutor("T100", "Nicolas", "Garcia", "Pedrajas", "ngarcia", "admin123", "TUTOR", "1980-05-12");
-    User alumno("A55", "Lucia", "Fernandez", "Perez", "lfernandez", "alum456", "STUDENT", "2004-02-28");
-
-    std::cout << "\n> Insertando usuarios en la base de datos..." << std::endl;
-    db.insertUser(tutor);
-    db.insertUser(alumno);
-
-    // 3. CREACIÓN DE UNA ALERTA
-    Alert aviso("T100", "A55", "2025-12-18", "Nueva Practica", "Ya teneis subida la P3 a Moodle.");
     
-    std::cout << "> Enviando alerta..." << std::endl;
-    db.insertAlert(aviso);
 
-    // 4. SIMULACIÓN DE CHAT
-    Message m1("A55", "T100", "Hola profesor, ¿la entrega es el viernes?", "10:00:05");
-    Message m2("T100", "A55", "Si Lucia, antes de las 23:59.", "10:05:12");
-    Message m3("A55", "T100", "Perfecto, gracias.", "10:06:01");
+    // --- SOLO PARA PRUEBAS ESTO NO DEBE ESTAR EN LA VERSION FINAL----------------------------------------------------------------------------------------------------
+    // --- CARGA DE DATOS DE PRUEBA (2 TUTORES Y 4 ALUMNOS) ---
+    
+    // Tutores
+    User t1("T100", "Nicolas", "Garcia", "Pedrajas", "ngarcia", "admin123", "TUTOR", "1980-05-12");
+    User t2("T101", "Maria", "Gomez", "Ruiz", "mgomez", "tutor789", "TUTOR", "1985-10-20");
 
-    std::cout << "> Registrando mensajes de chat..." << std::endl;
-    db.insertMessage(m1);
-    db.insertMessage(m2);
-    db.insertMessage(m3);
+    // Alumnos
+    User a1("A55", "Lucia", "Fernandez", "Perez", "lfernandez", "alum456", "STUDENT", "2004-02-28");
+    User a2("A56", "Pablo", "Cano", "Ruiz", "pcano", "pablo2025", "STUDENT", "2003-05-15");
+    User a3("A57", "Elena", "Marin", "Lara", "emarin", "elena99", "STUDENT", "2004-11-02");
+    User a4("A58", "Jorge", "Saez", "Mota", "jsaez", "jorgeuco", "STUDENT", "2002-08-12");
 
-    // 5. PRUEBA DE LOGIN REA
-    // El sistema buscará en la DB si el ID y la PASS coinciden
+    // Insertar en la Base de Datos
+    db.insertUser(t1); db.insertUser(t2);
+    db.insertUser(a1); db.insertUser(a2); db.insertUser(a3); db.insertUser(a4);
+    //-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
     SystemController system(db);
-    std::string id_login, pass_login;
+    int opcionPrincipal = 0;
 
-    std::cout << "\n--- SIMULACION DE INICIO DE SESION ---" << std::endl;
-    std::cout << "Introduce ID de usuario (Prueba con T100): ";
-    std::cin >> id_login;
-    std::cout << "Introduce Password (Prueba con admin123): ";
-    std::cin >> pass_login;
+    while (true) {
+        std::cout << "\n====================================" << std::endl;
+        std::cout << "   SISTEMA DE TUTORIAS UCO - 2025   " << std::endl;
+        std::cout << "====================================" << std::endl;
+        std::cout << "1. Iniciar Sesion" << std::endl;
+        std::cout << "2. Salir" << std::endl;
+        std::cout << "Opcion: ";
+        std::cin >> opcionPrincipal;
 
-    if (system.login(id_login, pass_login)) {
-        std::cout << "Acceso concedido como: " << system.getCurrentUser()->getFirstName() << std::endl;
-        std::cout << "Rol del usuario: " << system.getCurrentUser()->getRole() << std::endl;
-    } else {
-        std::cout << "Acceso denegado. Credenciales incorrectas." << std::endl;
+        if (opcionPrincipal == 2) break;
+
+        if (opcionPrincipal == 1) {
+            std::string id, pass;
+            std::cout << "\nUsuario: "; 
+            std::cin >> id;
+            std::cout << "Contrasena: "; 
+            std::cin >> pass;
+
+            // 2. Autenticación Real contra la DB
+            if (system.login(id, pass)) {
+                std::string rol = system.getCurrentUser()->getRole();
+                
+                if (rol == "TUTOR" || rol == "ADMIN") {
+                    mostrarMenuTutor(system, db);
+                } else {
+                    mostrarMenuAlumno(system, db);
+                }
+                system.logout();
+            }
+        }
     }
 
-    // 6. MOSTRAR RESULTADOS GENERALES
-    std::cout << "\n--- ESTADO FINAL DE LA BASE DE DATOS ---" << std::endl;
-    db.showUsers();
-    db.showAlerts();
-    
-    // Ver el chat especifico entre los dos usuarios de prueba
-    db.showMessages("A55", "T100");
-
-    // 7. Cierre seguro de recursos
     db.closeConnection();
-    std::cout << "\n=== PRUEBA FINALIZADA CORRECTAMENTE ===" << std::endl;
-
+    std::cout << "Saliendo del sistema de forma segura..." << std::endl;
     return 0;
+}
+
+// --- PANEL PARA EL ROL TUTOR ---
+void mostrarMenuTutor(SystemController& system, DBManager& db) {
+    int opt;
+    do {
+        std::cout << "\n--- PANEL DE CONTROL (TUTOR) ---" << std::endl;
+        std::cout << "1. Listar todos los Alumnos" << std::endl;
+        std::cout << "2. Enviar Alerta a Alumno" << std::endl;
+        std::cout << "3. Ver Chat con un Alumno" << std::endl;
+        std::cout << "4. Cerrar Sesion" << std::endl;
+        std::cout << "Opcion: "; 
+        std::cin >> opt;
+
+        switch(opt) {
+            case 1: 
+                db.showUsers(); 
+                break;
+            case 2: {
+                std::string receptor, asunto, msg;
+                std::cout << "ID del Alumno receptor: "; 
+                std::cin >> receptor;
+                std::cout << "Asunto de la alerta: "; 
+                std::cin.ignore(); // Limpiar buffer
+                std::getline(std::cin, asunto);
+                std::cout << "Cuerpo del mensaje: "; 
+                std::getline(std::cin, msg);
+                
+                Alert a(system.getCurrentUser()->getId(), receptor, system.getCurrentDateTime(), asunto, msg);
+                if(db.insertAlert(a)) std::cout << "Alerta guardada en DB." << std::endl;
+                break;
+            }
+            case 3: {
+                std::string studentId;
+                std::cout << "Introduce el ID del alumno para cargar el chat: ";
+                std::cin >> studentId;
+                // Uso de tu función personalizada
+                db.showMessages(system.getCurrentUser()->getId(), studentId); 
+                break;
+            }
+        }
+    } while (opt != 4);
+}
+
+// --- PANEL PARA EL ROL ALUMNO ---
+void mostrarMenuAlumno(SystemController& system, DBManager& db) {
+    int opt;
+    do {
+        std::cout << "\n--- PANEL DE ALUMNO ---" << std::endl;
+        std::cout << "1. Ver mis Alertas recibidas" << std::endl;
+        std::cout << "2. Enviar Mensaje al Tutor" << std::endl;
+        std::cout << "3. Ver Historial de Chat con Tutor" << std::endl;
+        std::cout << "4. Ver mis Datos de Perfil" << std::endl;
+        std::cout << "5. Cerrar Sesion" << std::endl;
+        std::cout << "Opcion: "; 
+        std::cin >> opt;
+
+        switch(opt) {
+            case 1: 
+                db.showAlerts(); 
+                break;
+            case 2: {
+                std::string tutorId, texto;
+                std::cout << "ID del Tutor: "; 
+                std::cin >> tutorId;
+                std::cout << "Escribe tu mensaje: "; 
+                std::cin.ignore(); 
+                std::getline(std::cin, texto);
+                
+                Message m(system.getCurrentUser()->getId(), tutorId, texto, system.getCurrentDateTime());
+                if(db.insertMessage(m)) std::cout << "Mensaje enviado." << std::endl;
+                break;
+            }
+            case 3: {
+                std::string tutorId;
+                std::cout << "ID del Tutor para ver conversacion: ";
+                std::cin >> tutorId;
+                db.showMessages(system.getCurrentUser()->getId(), tutorId);
+                break;
+            }
+            case 4: 
+                system.getCurrentUser()->printProfile(); 
+                break;
+        }
+    } while (opt != 5);
 }

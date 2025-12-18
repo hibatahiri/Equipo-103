@@ -114,9 +114,9 @@ static int loginCallback(void* data, int argc, char** argv, char** azColName) {
     return 0;
 }
 
-User* DBManager::authenticateUser(std::string id, std::string pass) {
+User* DBManager::authenticateUser(std::string username, std::string pass) {
     LoginResult result;
-    std::string sql = "SELECT * FROM Users WHERE id = '" + id + "' AND password = '" + pass + "';";
+    std::string sql = "SELECT * FROM Users WHERE moodle_user = '" + username + "' AND password = '" + pass + "';";
     
     sqlite3_exec(db, sql.c_str(), loginCallback, &result, nullptr);
     
@@ -172,7 +172,7 @@ void DBManager::showMessages(std::string id1, std::string id2) {
                       "(sender_id='" + id1 + "' AND receiver_id='" + id2 + "') OR "
                       "(sender_id='" + id2 + "' AND receiver_id='" + id1 + "') "
                       "ORDER BY timestamp ASC;";
-    std::cout << "\n--- CONVERSACION ENTRE " << id1 << " Y " << id2 << " ---" << std::endl;
+    std::cout << "\n--- CHAT ENTRE " << id1 << " Y " << id2 << " ---" << std::endl;
     sqlite3_exec(db, sql.c_str(), callback, 0, nullptr);
 }
 
