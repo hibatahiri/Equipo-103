@@ -41,6 +41,18 @@ void DBManager::initializeSchema() {
         "role TEXT NOT NULL, "
         "birth_date TEXT);";
 
+    // Tabla de Mensajes (CHAT)
+    //Atributos (id INTEGER PRIMARY KEY AUTOINCREMENT, sender_id TEXT, receiver_id TEXT, content TEXT, timestamp TEXT)
+    std::string sqlMessages = 
+        "CREATE TABLE IF NOT EXISTS Messages ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "sender_id TEXT NOT NULL, "
+        "receiver_id TEXT NOT NULL, "
+        "content TEXT NOT NULL, "
+        "timestamp TEXT NOT NULL, "
+        "FOREIGN KEY(sender_id) REFERENCES Users(id), "
+        "FOREIGN KEY(receiver_id) REFERENCES Users(id));";
+
     //Tabla de Alertas (Gestion de avisos y notificaciones)
     //Atributos (id INTEGER PRIMARY KEY AUTOINCREMENT, sender_id TEXT, receiver_id TEXT, date TEXT, subject TEXT, description TEXT, status TEXT)
     std::string sqlAlerts = 
@@ -67,6 +79,7 @@ void DBManager::initializeSchema() {
 
     char* errMsg = nullptr;
     sqlite3_exec(db, sqlUsers.c_str(), nullptr, 0, &errMsg);
+    sqlite3_exec(db, sqlMessages.c_str(), nullptr, 0, nullptr);
     sqlite3_exec(db, sqlAlerts.c_str(), nullptr, 0, &errMsg);
     sqlite3_exec(db, sqlAssignments.c_str(), nullptr, 0, &errMsg);
 
@@ -74,8 +87,6 @@ void DBManager::initializeSchema() {
         sqlite3_free(errMsg);
     }
 }
-
-
 
 
 //Función auxiliar para procesar y mostrar los resultados de una consulta SELECT
@@ -89,13 +100,35 @@ static int callback(void* NotUsed, int argc, char** argv, char** azColName) {
 }
 
 
+struct LoginResult {
+    User* user = nullptr;
+};
+
+//Función auxiliar para procesar el LOGIN
+static int loginCallback(void* data, int argc, char** argv, char** azColName) {
+    LoginResult* result = static_cast<LoginResult*>(data);
+    if (argc > 0) {
+        // Si hay resultados, creamos el objeto User con los datos de la DB
+        result->user = new User(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], argv[6], argv[7]);
+    }
+    return 0;
+}
+
+User* DBManager::authenticateUser(std::string id, std::string pass) {
+    LoginResult result;
+    std::string sql = "SELECT * FROM Users WHERE id = '" + id + "' AND password = '" + pass + "';";
+    
+    sqlite3_exec(db, sql.c_str(), loginCallback, &result, nullptr);
+    
+    return result.user; // Retorna el usuario encontrado o nullptr si falló
+}
 
 // [USUARIOS]
 
 //Insertar
 //Atributos (id, first_name, last_name, moodle_user, password, role, birth_date)
-bool DBManager::insertUser(std::string id, std::string fn, std::string ln1, std::string ln2, std::string moodle, std::string pass, std::string role, std::string birth) {
-    std::string sql = "INSERT OR IGNORE INTO Users VALUES ('" + id + "', '" + fn + "', '" + ln1 + "', '" + ln2 + "', '" + moodle + "', '" + pass + "', '" + role + "', '" + birth + "');";
+bool DBManager::insertUser(const User& u) {
+    std::string sql = "INSERT OR IGNORE INTO Users VALUES ('" + u.getId() + "', '" + u.getFirstName() + "', '" + u.getLastName1() + "', '" + u.getLastName2() + "', '" + u.getMoodle() + "', '" + u.getPass() + "', '" + u.getRole() + "', '" + u.getBirth() + "');";
     return sqlite3_exec(db, sql.c_str(), nullptr, 0, nullptr) == SQLITE_OK;
 }
 
@@ -114,14 +147,46 @@ void DBManager::showUsers() {
 }
 
 
+// [MENSAJES]
+
+//Insertar
+//Atributos (sender_id, receiver_id, content, timestamp)
+bool DBManager::insertMessage(const Message& m) {
+    std::string sql = "INSERT INTO Messages (sender_id, receiver_id, content, timestamp) VALUES ('" + 
+                      m.getSender() + "', '" + m.getReceiver() + "', '" + 
+                      m.getText() + "', '" + m.getTime() + "');";
+    return sqlite3_exec(db, sql.c_str(), nullptr, 0, nullptr) == SQLITE_OK;
+}
+
+//Borrar
+//Atributos (id INTEGER)
+bool DBManager::deleteMessage(int id) {
+    std::string sql = "DELETE FROM Messages WHERE id = " + std::to_string(id) + ";";
+    return sqlite3_exec(db, sql.c_str(), nullptr, 0, nullptr) == SQLITE_OK;
+}
+
+//Mostrar (Chat específico entre dos usuarios)
+//Atributos (id1 TEXT, id2 TEXT)
+void DBManager::showMessages(std::string id1, std::string id2) {
+    std::string sql = "SELECT timestamp, sender_id, content FROM Messages WHERE "
+                      "(sender_id='" + id1 + "' AND receiver_id='" + id2 + "') OR "
+                      "(sender_id='" + id2 + "' AND receiver_id='" + id1 + "') "
+                      "ORDER BY timestamp ASC;";
+    std::cout << "\n--- CONVERSACION ENTRE " << id1 << " Y " << id2 << " ---" << std::endl;
+    sqlite3_exec(db, sql.c_str(), callback, 0, nullptr);
+}
+
+
 
 // [ALERTAS]
 
 //Insertar
 //Atributos (sender_id, receiver_id, date, subject, description, status)
-bool DBManager::insertAlert(std::string sender, std::string receiver, std::string date, std::string subject, std::string desc) {
-    std::string sql = "INSERT INTO Alerts (sender_id, receiver_id, date, subject, description) VALUES ('" 
-                      + sender + "', '" + receiver + "', '" + date + "', '" + subject + "', '" + desc + "');";
+bool DBManager::insertAlert(const Alert& a) {
+    std::string sql = "INSERT INTO Alerts (sender_id, receiver_id, date, subject, description, status) VALUES ('" + 
+                      a.getSender() + "', '" + a.getReceiver() + "', '" + 
+                      a.getDate() + "', '" + a.getSubject() + "', '" + 
+                      a.getDesc() + "', '" + a.getStatus() + "');";
     return sqlite3_exec(db, sql.c_str(), nullptr, 0, nullptr) == SQLITE_OK;
 }
 

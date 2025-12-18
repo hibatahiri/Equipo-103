@@ -1,48 +1,78 @@
 #include <iostream>
-#include "DBManager.h"
+#include <vector>
+#include <string>
+#include "src/Database/DBManager.h"
+#include "src/Users/Users.h"
+#include "src/Alert/Alert.h"
+#include "src/Chat/Chat.h"
+#include "src/System/System.h"
 
 int main() {
-    DBManager dbManager;
+    DBManager db;
 
-    std::cout << "--- INICIANDO SIMULACION DEL SISTEMA UCO ---" << std::endl;
+    std::cout << "=== INICIANDO PRUEBA DEL SISTEMA UCO ===" << std::endl;
 
-    if (dbManager.openConnection()) {
-        // 1. Limpiamos y preparamos el esquema
-        dbManager.initializeSchema();
-
-        // 2. REGISTRO DE TUTORES (T1, T2)
-        // Parametros: id, nombre, apellido1, apellido2, moodle, pass, rol, fecha_nac
-        dbManager.insertUser("T1", "Maria", "Martin", "Fernandez", "mmartin", "tutor123", "TUTOR", "1985-03-20");
-        dbManager.insertUser("T2", "Antonio", "Ramos", "Jimenez", "aramos", "tutor456", "TUTOR", "1990-07-12");
-
-        // 3. REGISTRO DE ALUMNOS (A1, A2, A3)
-        dbManager.insertUser("A1", "Juan", "Perez", "Garcia", "jperez", "alum1", "STUDENT", "2003-11-05");
-        dbManager.insertUser("A2", "Ana", "Lopez", "Sanz", "alopez", "alum2", "STUDENT", "2004-01-15");
-        dbManager.insertUser("A3", "Luis", "Gomez", "Ruiz", "lgomez", "alum3", "STUDENT", "2003-05-22");
-
-        // 4. ASIGNACION DE TUTORIAS
-        // Juan (A1) y Ana (A2) con Maria (T1)
-        dbManager.insertAssignment("A1", "T1", "2025-12-17");
-        dbManager.insertAssignment("A2", "T1", "2025-12-17");
-        // Luis (A3) con Antonio (T2)
-        dbManager.insertAssignment("A3", "T2", "2025-12-17");
-
-        // 5. ENVIO DE ALERTAS DE PRUEBA
-        dbManager.insertAlert("T1", "A1", "2025-12-17", "Bienvenida", "Hola Juan, soy tu tutora Maria.");
-        dbManager.insertAlert("T2", "A3", "2025-12-17", "Cita", "Luis, tenemos reunion mañana a las 10:00.");
-
-        // 6. MOSTRAR RESULTADOS POR TERMINAL
-        // Nota: Los usuarios apareceran ordenados por apellido1 y apellido2
-        dbManager.showUsers();
-        dbManager.showAssignments();
-        dbManager.showAlerts();
-
-        // 7. Cierre seguro de la conexion
-        dbManager.closeConnection();
-        std::cout << "--- SIMULACION FINALIZADA ---" << std::endl;
-    } else {
-        std::cerr << "No se pudo conectar a la base de datos." << std::endl;
+    // 1. Conexión e Inicialización
+    if (!db.openConnection()) {
+        std::cerr << "Error: No se pudo abrir la base de datos." << std::endl;
+        return 1;
     }
+    db.initializeSchema();
+
+    // 2. CREACIÓN DE USUARIOS
+    // Estos datos se guardarán físicamente en la DB
+    User tutor("T100", "Nicolas", "Garcia", "Pedrajas", "ngarcia", "admin123", "TUTOR", "1980-05-12");
+    User alumno("A55", "Lucia", "Fernandez", "Perez", "lfernandez", "alum456", "STUDENT", "2004-02-28");
+
+    std::cout << "\n> Insertando usuarios en la base de datos..." << std::endl;
+    db.insertUser(tutor);
+    db.insertUser(alumno);
+
+    // 3. CREACIÓN DE UNA ALERTA
+    Alert aviso("T100", "A55", "2025-12-18", "Nueva Practica", "Ya teneis subida la P3 a Moodle.");
+    
+    std::cout << "> Enviando alerta..." << std::endl;
+    db.insertAlert(aviso);
+
+    // 4. SIMULACIÓN DE CHAT
+    Message m1("A55", "T100", "Hola profesor, ¿la entrega es el viernes?", "10:00:05");
+    Message m2("T100", "A55", "Si Lucia, antes de las 23:59.", "10:05:12");
+    Message m3("A55", "T100", "Perfecto, gracias.", "10:06:01");
+
+    std::cout << "> Registrando mensajes de chat..." << std::endl;
+    db.insertMessage(m1);
+    db.insertMessage(m2);
+    db.insertMessage(m3);
+
+    // 5. PRUEBA DE LOGIN REA
+    // El sistema buscará en la DB si el ID y la PASS coinciden
+    SystemController system(db);
+    std::string id_login, pass_login;
+
+    std::cout << "\n--- SIMULACION DE INICIO DE SESION ---" << std::endl;
+    std::cout << "Introduce ID de usuario (Prueba con T100): ";
+    std::cin >> id_login;
+    std::cout << "Introduce Password (Prueba con admin123): ";
+    std::cin >> pass_login;
+
+    if (system.login(id_login, pass_login)) {
+        std::cout << "Acceso concedido como: " << system.getCurrentUser()->getFirstName() << std::endl;
+        std::cout << "Rol del usuario: " << system.getCurrentUser()->getRole() << std::endl;
+    } else {
+        std::cout << "Acceso denegado. Credenciales incorrectas." << std::endl;
+    }
+
+    // 6. MOSTRAR RESULTADOS GENERALES
+    std::cout << "\n--- ESTADO FINAL DE LA BASE DE DATOS ---" << std::endl;
+    db.showUsers();
+    db.showAlerts();
+    
+    // Ver el chat especifico entre los dos usuarios de prueba
+    db.showMessages("A55", "T100");
+
+    // 7. Cierre seguro de recursos
+    db.closeConnection();
+    std::cout << "\n=== PRUEBA FINALIZADA CORRECTAMENTE ===" << std::endl;
 
     return 0;
 }

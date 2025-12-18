@@ -2,6 +2,9 @@
 #define DBMANAGER_H
 
 #include "sqlite3.h"
+#include "../Users/Users.h"
+#include "../Chat/Chat.h"
+#include "../Alert/Alert.h"
 #include <string>
 #include <vector>
 
@@ -22,13 +25,22 @@ public:
     // Crea las tablas del sistema si no existen todavía
     void initializeSchema();
 
+    // Devuelve un objeto User si las credenciales son correctas, si no, devuelve nullptr
+    User* authenticateUser(std::string id, std::string pass);
+    
     // Funciones de insercion, eliminacion y mostrar para Users
-    bool insertUser(std::string id, std::string fn, std::string ln1, std::string ln2, std::string moodle, std::string pass, std::string role, std::string birth);
+    bool insertUser(const User& u);
     bool deleteUser(std::string id);
     void showUsers();
 
+    // Funciones de insercion, eliminacion y mostrar para Message
+    bool insertMessage(const Message& m);
+    bool deleteMessage(int id);
+    void showMessages(std::string id1, std::string id2);
+
+
     // Funciones de insercion, eliminacion y mostrar para Alert
-    bool insertAlert(std::string sender, std::string receiver, std::string date, std::string subject, std::string desc);
+    bool insertAlert(const Alert& a);
     bool deleteAlert(int id);
     void showAlerts();
 
