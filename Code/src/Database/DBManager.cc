@@ -228,3 +228,83 @@ void DBManager::showAssignments() {
     std::cout << "\n--- RELACIONES ALUMNO-TUTOR ---" << std::endl;
     sqlite3_exec(db, "SELECT * FROM Assignments;", callback, 0, nullptr);
 }
+
+//--------------------------------------------------------------------------------------------------------------------------------
+
+std::vector<std::string> DBManager::getUserIdsByRole(std::string role) {
+    std::vector<std::string> ids;
+    std::string sql = "SELECT id FROM Users WHERE role = '" + role + "';";
+    sqlite3_stmt* stmt;
+    
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            const char* text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            if (text) ids.push_back(text);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return ids; // Devuelve la lista de IDs encontrados
+}
+
+bool DBManager::updateAlertStatus(int alertId, std::string status) {
+    std::string sql = "UPDATE Alerts SET status = '" + status + 
+                      "' WHERE rowid = " + std::to_string(alertId) + ";";
+    // Nota: Usamos rowid si no definiste una clave primaria autoincremental en Alerts
+    return sqlite3_exec(db, sql.c_str(), nullptr, 0, nullptr) == SQLITE_OK;
+}
+
+bool DBManager::resetForNewAssignment() {
+
+    bool m = sqlite3_exec(db, "DELETE FROM Messages;", nullptr, 0, nullptr) == SQLITE_OK;
+    bool a = sqlite3_exec(db, "DELETE FROM Alerts;", nullptr, 0, nullptr) == SQLITE_OK;
+    bool as = sqlite3_exec(db, "DELETE FROM Assignments;", nullptr, 0, nullptr) == SQLITE_OK;
+    
+    return (m && a && as); // Retorna true si las tres tablas se limpiaron
+}
+
+
+void DBManager::showStudentsByTutor(std::string tutorId) {
+    // Consulta SQL con JOIN para filtrar por tutor asignado
+    std::string sql = "SELECT U.* FROM Users U "
+                      "JOIN Assignments A ON U.id = A.student_id "
+                      "WHERE A.tutor_id = '" + tutorId + "';";
+
+    std::cout << "\n--- MIS ALUMNOS ASIGNADOS ---" << std::endl;
+    
+    sqlite3_exec(db, sql.c_str(), callback, 0, nullptr);
+}
+
+void DBManager::showAlertsForUser(std::string userId) {
+    // Seleccionamos rowid por si el alumno necesitara referenciarla
+    // Filtramos por receptor_id para que sea privado
+    std::string sql = "SELECT rowid, * FROM Alerts WHERE receiver_id = '" + userId + "';";
+
+    std::cout << "\n--- MIS ALERTAS RECIBIDAS ---" << std::endl;
+    sqlite3_exec(db, sql.c_str(), callback, 0, nullptr);
+}
+
+void DBManager::showAlertsByTutor(std::string tutorId) {
+    // Filtramos para que solo vea lo relacionado con su ID
+    std::string sql = "SELECT rowid, * FROM Alerts WHERE sender_id = '" + tutorId + 
+                      "' OR receiver_id = '" + tutorId + "';";
+
+    std::cout << "\n--- MIS ALERTAS GESTIONADAS ---" << std::endl;
+
+    sqlite3_exec(db, sql.c_str(), callback, 0, nullptr);
+}
+
+
+std::string DBManager::getTutorIdByStudent(std::string studentId) {
+    std::string tutorId = "";
+    std::string sql = "SELECT tutor_id FROM Assignments WHERE student_id = '" + studentId + "';";
+    sqlite3_stmt* stmt;
+    
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            const char* text = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            if (text) tutorId = text;
+        }
+    }
+    sqlite3_finalize(stmt);
+    return tutorId; // Retorna el ID del tutor o un string vacío si no tiene
+}

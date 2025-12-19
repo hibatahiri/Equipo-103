@@ -1,8 +1,11 @@
 #ifndef USERS_H
 #define USERS_H
 
-#include <string>
 #include <iostream>
+#include <string>
+#include <vector>
+
+class DBManager;
 
 class User {
 private:
@@ -32,6 +35,27 @@ public:
 
     // Función útil para mostrar el perfil del usuario por consola
     void printProfile() const;
+};
+
+
+class Coordinator : public User {
+public:
+    // Constructor que hereda el de la clase base User
+    Coordinator(std::string id, std::string fn, std::string ln1, std::string ln2, 
+                std::string m, std::string p, std::string r, std::string b)
+        : User(id, fn, ln1, ln2, m, p, r, b) {}
+
+    // 1. Asignación automática y reinicio
+    void autoAssignStudents(DBManager& db, std::string currentDate);
+
+    // 2. Gestión de Alertas
+    void manageAlerts(DBManager& db);
+
+    // 3. Listar todos los usuarios
+    void listUsers(DBManager& db);
+
+    // 4. Listar las relaciones Alumno-Tutor
+    void listAssignments(DBManager& db);
 };
 
 #endif

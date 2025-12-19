@@ -48,6 +48,19 @@ public:
     bool insertAssignment(std::string studentId, std::string tutorId, std::string date);
     bool deleteAssignment(std::string studentId);
     void showAssignments();
+
+
+    std::vector<std::string> getUserIdsByRole(std::string role); // Obtener IDs de usuarios filtrando por rol
+    bool updateAlertStatus(int alertId, std::string status); // Actualiza el estado de las alertas
+    bool resetForNewAssignment(); // Reinicia chats, alertas y asignaciones
+
+    void showStudentsByTutor(std::string tutorId);
+
+    void showAlertsForUser(std::string userId);
+    void showAlertsByTutor(std::string tutorId);
+
+    std::string getTutorIdByStudent(std::string studentId);
+
 };
 
 #endif
