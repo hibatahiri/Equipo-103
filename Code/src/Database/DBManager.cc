@@ -95,22 +95,43 @@ void DBManager::initializeSchema() {
 static int callback(void* data, int argc, char** argv, char** azColName) {
     bool* isFirstRow = (bool*)data;
 
-    // 1. Dibujar la cabecera solo la primera vez que entra
+auto getWidth = [](std::string colName) {
+        // CAMBIO: 20 espacios para IDs largos (Matrículas, DNIs, etc.)
+        if (colName == "id") return 20; 
+        
+        // Espacio para "Nombre Apellido"
+        if (colName == "Emisor" || colName == "Receptor") return 22; 
+        
+        // Espacio para "2025-01-20 10:30:00"
+        if (colName == "date" || colName == "timestamp") return 22;
+        
+        // Asuntos y Contenidos
+        if (colName == "subject") return 30;
+        if (colName == "description" || colName == "content") return 50;
+        if (colName == "status") return 15;
+        
+        return 20; // Por defecto para cualquier otra cosa
+    };
+
     if (*isFirstRow) {
+        std::cout << "\n";
+        int totalLength = 0;
         for (int i = 0; i < argc; i++) {
-            // Ajustamos el ancho (setw) según el tipo de dato
-            std::cout << std::left << std::setw(18) << azColName[i];
+            int w = getWidth(azColName[i]);
+            std::cout << std::left << std::setw(w) << azColName[i];
+            totalLength += w;
         }
-        std::cout << "\n" << std::string(argc * 18, '-') << std::endl;
-        *isFirstRow = false; // Cambiamos el estado para las siguientes filas
+        std::cout << "\n" << std::string(totalLength, '-') << std::endl;
+        *isFirstRow = false;
     }
 
-    // 2. Dibujar la fila de datos
     for (int i = 0; i < argc; i++) {
-        std::cout << std::left << std::setw(18) << (argv[i] ? argv[i] : "NULL");
+        int w = getWidth(azColName[i]);
+        std::string val = (argv[i] ? argv[i] : "NULL");
+        if (val.length() > (w - 2)) val = val.substr(0, w - 5) + "...";
+        std::cout << std::left << std::setw(w) << val;
     }
     std::cout << std::endl;
-
     return 0;
 }
 
@@ -189,12 +210,20 @@ bool DBManager::deleteMessage(int id) {
 //Atributos (id1 TEXT, id2 TEXT)
 void DBManager::showMessages(std::string id1, std::string id2) {
     bool headerNeeded = true;
-    std::string sql = "SELECT timestamp, sender_id, content FROM Messages WHERE "
-                      "(sender_id='" + id1 + "' AND receiver_id='" + id2 + "') OR "
-                      "(sender_id='" + id2 + "' AND receiver_id='" + id1 + "') "
-                      "ORDER BY timestamp ASC;";
-    std::cout << "\n--- CHAT ENTRE " << id1 << " Y " << id2 << " ---" << std::endl;
-    sqlite3_exec(db, sql.c_str(), callback, &headerNeeded, nullptr); // <--- CAMBIAR 0 POR &headerNeeded
+    
+    // Solo traducimos el nombre del que envía el mensaje (Sender)
+    std::string sql = 
+        "SELECT M.timestamp, "
+        "(U.first_name || ' ' || U.last_name1) AS Emisor, "
+        "M.content "
+        "FROM Messages M "
+        "JOIN Users U ON M.sender_id = U.id "
+        "WHERE (M.sender_id='" + id1 + "' AND M.receiver_id='" + id2 + "') "
+        "OR (M.sender_id='" + id2 + "' AND M.receiver_id='" + id1 + "') "
+        "ORDER BY M.timestamp ASC;";
+
+    std::cout << "\n--- HISTORIAL DE CHAT ---" << std::endl;
+    sqlite3_exec(db, sql.c_str(), callback, &headerNeeded, nullptr);
 }
 
 
@@ -297,17 +326,36 @@ void DBManager::showStudentsByTutor(std::string tutorId) {
 
 void DBManager::showAlertsForUser(std::string userId) {
     bool headerNeeded = true;
-    std::string sql = "SELECT rowid, * FROM Alerts WHERE receiver_id = '" + userId + "';";
+    
+    // SQL AVANZADO:
+    // 1. Unimos la tabla Alerts (A) con Users (U) usando el ID del Emisor (sender_id).
+    // 2. Concatenamos U.first_name + espacio + U.last_name1 y lo llamamos 'Emisor'.
+    std::string sql = 
+        "SELECT A.id, "
+        "(U.first_name || ' ' || U.last_name1) AS Emisor, " // <--- LA MAGIA
+        "A.date, A.subject, A.description, A.status "
+        "FROM Alerts A "
+        "JOIN Users U ON A.sender_id = U.id "
+        "WHERE A.receiver_id = '" + userId + "';";
+
     std::cout << "\n--- MIS ALERTAS RECIBIDAS ---" << std::endl;
     sqlite3_exec(db, sql.c_str(), callback, &headerNeeded, nullptr);
 }
 
 void DBManager::showAlertsByTutor(std::string tutorId) {
     bool headerNeeded = true;
-    std::string sql = "SELECT rowid, * FROM Alerts WHERE sender_id = '" + tutorId + 
-                      "' OR receiver_id = '" + tutorId + "';";
 
-    std::cout << "\n--- MIS ALERTAS GESTIONADAS ---" << std::endl;
+    std::string sql = 
+        "SELECT A.id, "
+        "(U1.first_name || ' ' || U1.last_name1) AS Emisor, "   // Traduce sender_id
+        "(U2.first_name || ' ' || U2.last_name1) AS Receptor, " // Traduce receiver_id
+        "A.date, A.subject, A.description, A.status "
+        "FROM Alerts A "
+        "LEFT JOIN Users U1 ON A.sender_id = U1.id "
+        "LEFT JOIN Users U2 ON A.receiver_id = U2.id "
+        "WHERE A.sender_id = '" + tutorId + "' OR A.receiver_id = '" + tutorId + "';";
+
+    std::cout << "\n--- GESTIÓN DE ALERTAS (TUTOR) ---" << std::endl;
     sqlite3_exec(db, sql.c_str(), callback, &headerNeeded, nullptr);
 }
 
