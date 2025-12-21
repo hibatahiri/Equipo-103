@@ -4,11 +4,34 @@
 #include <cstdlib> // system
 #include <thread>  // sleep
 #include <chrono>  // Para medir tiempo
+#include <limits>  // Para numeric_limits
 #include "src/Database/DBManager.h"
 #include "src/Users/Users.h"
 #include "src/Alert/Alert.h"
 #include "src/Chat/Chat.h"
 #include "src/System/System.h"
+
+// --- FUNCION AUXILIAR PARA LEER ENTEROS DE FORMA SEGURA ---
+// Esto evita que el programa entre en bucle infinito si pones una letra
+int leerOpcion(int min, int max) {
+    int opcion;
+    while (true) {
+        std::cout << "Seleccione una opcion (" << min << "-" << max << "): ";
+        if (std::cin >> opcion) {
+            if (opcion >= min && opcion <= max) {
+                // Entrada válida, limpiamos el buffer por si acaso quedaran saltos de línea
+                // y devolvemos el valor.
+                return opcion;
+            } else {
+                std::cout << ">> Error: Opcion fuera de rango." << std::endl;
+            }
+        } else {
+            std::cout << ">> Error: Entrada no valida. Por favor, introduzca un numero." << std::endl;
+            std::cin.clear(); // Limpiamos estado de error
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Vaciamos buffer
+        }
+    }
+}
 
 // Prototipos
 void mostrarMenuTutor(SystemController& system, DBManager& db);
@@ -25,7 +48,6 @@ int main() {
     }
     db.initializeSchema();
     
-
     // ==========================================
     //        ZONA DE DATOS DE PRUEBA
     // ==========================================
@@ -46,37 +68,23 @@ int main() {
     db.insertUser(c1);
 
     // --- 2. ASIGNACIONES (Relaciones Alumno-Tutor) ---
-    // Nicolás (T100) tendrá a Lucía y Pablo
     db.insertAssignment("A55", "T100", "2025-01-01");
     db.insertAssignment("A56", "T100", "2025-01-01");
-    
-    // María (T101) tendrá a Elena y Jorge
     db.insertAssignment("A57", "T101", "2025-01-01");
     db.insertAssignment("A58", "T101", "2025-01-01");
 
-    // --- 3. MENSAJES DE CHAT (Prueba Chat) ---
-    // Conversación entre Lucía (A55) y Nicolás (T100)
+    // --- 3. MENSAJES DE CHAT ---
     Message m1("A55", "T100", "Hola Nicolas, tengo una duda con la practica.", "2025-01-10 10:00");
-    Message m2("T100", "A55", "Dime Lucia, ¿en que ejercicio?", "2025-01-10 10:05");
+    Message m2("T100", "A55", "Dime Lucia, en que ejercicio?", "2025-01-10 10:05");
     Message m3("A55", "T100", "En el de punteros, me da error de segmento.", "2025-01-10 10:07");
-    
-    db.insertMessage(m1);
-    db.insertMessage(m2);
-    db.insertMessage(m3);
+    db.insertMessage(m1); db.insertMessage(m2); db.insertMessage(m3);
 
-    // --- 4. ALERTAS (Prueba Estado PENDING/COMPLETED) ---
-    // Alerta 1: Nicolás avisa a Pablo (Faltas) -> PENDING
+    // --- 4. ALERTAS ---
     Alert al1("T100", "A56", "2025-01-15", "Faltas de Asistencia", "Pablo, llevas 3 faltas injustificadas.", "PENDING");
-    
-    // Alerta 2: Elena pide tutoría a María -> PENDING
     Alert al2("A57", "T101", "2025-01-16", "Solicitud Tutoria", "Necesito revisar el examen parcial.", "PENDING");
-    
-    // Alerta 3: Una alerta vieja que ya está cerrada -> COMPLETED
     Alert al3("T101", "A58", "2025-01-12", "Entrega Practica 1", "Practica recibida correctamente.", "COMPLETED");
 
-    db.insertAlert(al1);
-    db.insertAlert(al2);
-    db.insertAlert(al3);
+    db.insertAlert(al1); db.insertAlert(al2); db.insertAlert(al3);
 
     // ==========================================
 
@@ -89,8 +97,9 @@ int main() {
         std::cout << "====================================" << std::endl;
         std::cout << "1. Iniciar Sesion" << std::endl;
         std::cout << "2. Salir" << std::endl;
-        std::cout << "Opcion: ";
-        std::cin >> opcionPrincipal;
+        
+        // USAMOS LA NUEVA FUNCIÓN ROBUSTA
+        opcionPrincipal = leerOpcion(1, 2);
 
         if (opcionPrincipal == 2) break;
 
@@ -112,19 +121,21 @@ int main() {
                     mostrarMenuAlumno(system, db);
                 }
                 system.logout();
+            } else {
+                std::cout << "\n>> ERROR: Credenciales incorrectas.\n" << std::endl;
             }
         }
     }
 
     db.closeConnection();
     std::cout << "Saliendo del sistema de forma segura..." << std::endl;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-    std::system("clear");
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::system("clear"); // Limpia terminal en Linux
     return 0;
 }
 
 // ---------------------------------------------------------
-//        FUNCIONES DE MENÚ (Ya corregidas)
+//        FUNCIONES DE MENÚ (Con entrada protegida)
 // ---------------------------------------------------------
 
 void mostrarMenuCoordinador(SystemController& system, DBManager& db) {
@@ -138,8 +149,8 @@ void mostrarMenuCoordinador(SystemController& system, DBManager& db) {
         std::cout << "3. Listar todos los Usuarios" << std::endl;
         std::cout << "4. Ver Asignaciones" << std::endl;
         std::cout << "5. Cerrar Sesion" << std::endl;
-        std::cout << "Opcion: ";
-        std::cin >> opt;
+        
+        opt = leerOpcion(1, 5); // PROTEGIDO
 
         switch(opt) {
             case 1:
@@ -151,7 +162,6 @@ void mostrarMenuCoordinador(SystemController& system, DBManager& db) {
             case 4: coord->listAssignments(db); break;
         }
     } while (opt != 5);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     std::system("clear");
 }
 
@@ -167,8 +177,8 @@ void mostrarMenuTutor(SystemController& system, DBManager& db) {
         std::cout << "4. Ver Chat con un Alumno" << std::endl;
         std::cout << "5. Enviar Mensaje Directo a Alumno" << std::endl;
         std::cout << "6. Cerrar Sesion" << std::endl;
-        std::cout << "Opcion: "; 
-        std::cin >> opt;
+        
+        opt = leerOpcion(1, 6); // PROTEGIDO
 
         switch(opt) {
             case 1: db.showStudentsByTutor(myId); break;
@@ -190,11 +200,17 @@ void mostrarMenuTutor(SystemController& system, DBManager& db) {
                 if (respuesta == 's' || respuesta == 'S') {
                     int alertId;
                     std::cout << "Introduce el ID de la alerta a cerrar: ";
-                    std::cin >> alertId;
+                    // Pequeña protección local para el ID
+                    while(!(std::cin >> alertId)) {
+                        std::cout << "ID invalido. Introduce un numero: ";
+                        std::cin.clear();
+                        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                    }
+
                     if (db.updateAlertStatus(alertId, "COMPLETED")) {
-                        std::cout << "Estado actualizado." << std::endl;
+                        std::cout << ">> Estado actualizado correctamente." << std::endl;
                     } else {
-                        std::cout << "Error al actualizar." << std::endl;
+                        std::cout << ">> Error: No se encontro alerta o fallo la actualizacion." << std::endl;
                     }
                 }
                 break;
@@ -215,7 +231,6 @@ void mostrarMenuTutor(SystemController& system, DBManager& db) {
             }
         }
     } while (opt != 6);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     std::system("clear");
 }
 
@@ -231,8 +246,8 @@ void mostrarMenuAlumno(SystemController& system, DBManager& db) {
         std::cout << "4. Enviar ALERTA al Tutor" << std::endl;
         std::cout << "5. Ver mis Datos de Perfil" << std::endl;
         std::cout << "6. Cerrar Sesion" << std::endl;
-        std::cout << "Opcion: "; 
-        std::cin >> opt;
+        
+        opt = leerOpcion(1, 6); // PROTEGIDO
 
         switch(opt) {
             case 1: db.showAlertsForUser(myId); break;
@@ -267,6 +282,5 @@ void mostrarMenuAlumno(SystemController& system, DBManager& db) {
             case 5: system.getCurrentUser()->printProfile(); break;
         }
     } while (opt != 6);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     std::system("clear");
 }
