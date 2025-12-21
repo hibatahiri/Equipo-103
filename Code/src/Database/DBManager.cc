@@ -1,5 +1,6 @@
 #include "DBManager.h"
 #include <iostream>
+#include <iomanip>
 
 DBManager::DBManager() {
     db = nullptr; //Inicializamos el puntero a nulo por seguridad
@@ -91,11 +92,25 @@ void DBManager::initializeSchema() {
 
 //Función auxiliar para procesar y mostrar los resultados de una consulta SELECT
 //Atributos (argc: numero de columnas, argv: valores de la fila, azColName: nombres de columnas)
-static int callback(void* NotUsed, int argc, char** argv, char** azColName) {
+static int callback(void* data, int argc, char** argv, char** azColName) {
+    bool* isFirstRow = (bool*)data;
+
+    // 1. Dibujar la cabecera solo la primera vez que entra
+    if (*isFirstRow) {
+        for (int i = 0; i < argc; i++) {
+            // Ajustamos el ancho (setw) según el tipo de dato
+            std::cout << std::left << std::setw(18) << azColName[i];
+        }
+        std::cout << "\n" << std::string(argc * 18, '-') << std::endl;
+        *isFirstRow = false; // Cambiamos el estado para las siguientes filas
+    }
+
+    // 2. Dibujar la fila de datos
     for (int i = 0; i < argc; i++) {
-        std::cout << azColName[i] << ": " << (argv[i] ? argv[i] : "NULL") << " | ";
+        std::cout << std::left << std::setw(18) << (argv[i] ? argv[i] : "NULL");
     }
     std::cout << std::endl;
+
     return 0;
 }
 
@@ -142,8 +157,13 @@ bool DBManager::deleteUser(std::string id) {
 //Mostrar
 //Atributos (SELECT * FROM Users)
 void DBManager::showUsers() {
-    std::cout << "\n--- USUARIOS REGISTRADOS ---" << std::endl;
-    sqlite3_exec(db, "SELECT * FROM Users;", callback, 0, nullptr);
+    bool headerNeeded = true; // El flag que usará el callback
+    std::string sql = "SELECT * FROM Users;";
+    
+    std::cout << "\n--- LISTADO DE USUARIOS ---" << std::endl;
+    // Pasamos &headerNeeded como 4º argumento
+    sqlite3_exec(db, sql.c_str(), callback, &headerNeeded, nullptr);
+    std::cout << "---------------------------\n" << std::endl;
 }
 
 
@@ -168,12 +188,13 @@ bool DBManager::deleteMessage(int id) {
 //Mostrar (Chat específico entre dos usuarios)
 //Atributos (id1 TEXT, id2 TEXT)
 void DBManager::showMessages(std::string id1, std::string id2) {
+    bool headerNeeded = true;
     std::string sql = "SELECT timestamp, sender_id, content FROM Messages WHERE "
                       "(sender_id='" + id1 + "' AND receiver_id='" + id2 + "') OR "
                       "(sender_id='" + id2 + "' AND receiver_id='" + id1 + "') "
                       "ORDER BY timestamp ASC;";
     std::cout << "\n--- CHAT ENTRE " << id1 << " Y " << id2 << " ---" << std::endl;
-    sqlite3_exec(db, sql.c_str(), callback, 0, nullptr);
+    sqlite3_exec(db, sql.c_str(), callback, &headerNeeded, nullptr); // <--- CAMBIAR 0 POR &headerNeeded
 }
 
 
@@ -200,8 +221,9 @@ bool DBManager::deleteAlert(int id) {
 //Mostrar
 //Atributos (SELECT * FROM Alerts)
 void DBManager::showAlerts() {
+    bool headerNeeded = true; // <--- AÑADIR
     std::cout << "\n--- LISTA DE ALERTAS ---" << std::endl;
-    sqlite3_exec(db, "SELECT * FROM Alerts;", callback, 0, nullptr);
+    sqlite3_exec(db, "SELECT * FROM Alerts;", callback, &headerNeeded, nullptr); // <--- CAMBIAR 0 POR &headerNeeded
 }
 
 
@@ -225,8 +247,9 @@ bool DBManager::deleteAssignment(std::string studentId) {
 //Mostrar
 //Atributos (SELECT * FROM Assignments)
 void DBManager::showAssignments() {
+    bool headerNeeded = true; // <--- AÑADIR
     std::cout << "\n--- RELACIONES ALUMNO-TUTOR ---" << std::endl;
-    sqlite3_exec(db, "SELECT * FROM Assignments;", callback, 0, nullptr);
+    sqlite3_exec(db, "SELECT * FROM Assignments;", callback, &headerNeeded, nullptr); // <--- CAMBIAR 0 POR &headerNeeded
 }
 
 //--------------------------------------------------------------------------------------------------------------------------------
@@ -264,33 +287,28 @@ bool DBManager::resetForNewAssignment() {
 
 
 void DBManager::showStudentsByTutor(std::string tutorId) {
-    // Consulta SQL con JOIN para filtrar por tutor asignado
+    bool headerNeeded = true; 
     std::string sql = "SELECT U.* FROM Users U "
                       "JOIN Assignments A ON U.id = A.student_id "
                       "WHERE A.tutor_id = '" + tutorId + "';";
-
     std::cout << "\n--- MIS ALUMNOS ASIGNADOS ---" << std::endl;
-    
-    sqlite3_exec(db, sql.c_str(), callback, 0, nullptr);
+    sqlite3_exec(db, sql.c_str(), callback, &headerNeeded, nullptr);
 }
 
 void DBManager::showAlertsForUser(std::string userId) {
-    // Seleccionamos rowid por si el alumno necesitara referenciarla
-    // Filtramos por receptor_id para que sea privado
+    bool headerNeeded = true;
     std::string sql = "SELECT rowid, * FROM Alerts WHERE receiver_id = '" + userId + "';";
-
     std::cout << "\n--- MIS ALERTAS RECIBIDAS ---" << std::endl;
-    sqlite3_exec(db, sql.c_str(), callback, 0, nullptr);
+    sqlite3_exec(db, sql.c_str(), callback, &headerNeeded, nullptr);
 }
 
 void DBManager::showAlertsByTutor(std::string tutorId) {
-    // Filtramos para que solo vea lo relacionado con su ID
+    bool headerNeeded = true;
     std::string sql = "SELECT rowid, * FROM Alerts WHERE sender_id = '" + tutorId + 
                       "' OR receiver_id = '" + tutorId + "';";
 
     std::cout << "\n--- MIS ALERTAS GESTIONADAS ---" << std::endl;
-
-    sqlite3_exec(db, sql.c_str(), callback, 0, nullptr);
+    sqlite3_exec(db, sql.c_str(), callback, &headerNeeded, nullptr);
 }
 
 
