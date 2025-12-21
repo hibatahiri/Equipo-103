@@ -46,7 +46,7 @@ void Coordinator::autoAssignStudents(DBManager& db, std::string currentDate) {
         return;
     }
 
-    // 3. Reparto equilibrado (Round Robin)
+    // 3. Reparto equilibrado
     // El tutor asignado a cada alumno i se calcula como i mod n, donde n es el total de tutores
     for (size_t i = 0; i < students.size(); ++i) {
         std::string s_id = students[i];
